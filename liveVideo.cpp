@@ -10,6 +10,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <tuple>
+#include <string>
 
 using namespace cv;
 using namespace std;
@@ -30,7 +31,7 @@ Point objectCoords(Mat frame, Scalar lowerLimit, Scalar upperLimit){
 		meanX += location[i].x;
 		meanY += location[i].y;	
 	}
-	int x = frame.size().width/2, y = frame.size().height/2;
+	int x = -1, y = -1;
 
 	if(meanX != 0){
 		x = meanX/location.size();
@@ -40,53 +41,31 @@ Point objectCoords(Mat frame, Scalar lowerLimit, Scalar upperLimit){
 		y = meanY/location.size();
 	}
 
-	imshow("Threshold", output);
-
 	return Point(x,y);
 }
 
-// mouse test
-// Point pt(-1,-1);
+Scalar changeColor(Point pos, Scalar lineCol){
+	if(pos.x >= 550){
+		if(pos.y <= 155){
+			lineCol = Scalar(0,0,255);	// red color
+		}
+		else if(pos.y >= 170 && pos.y <= 310){
+			lineCol = Scalar(0,255,0); // green color
+		}
+		else if(pos.y >= 340 && pos.y <= 475){
+			lineCol = Scalar(255,0,0);	// blue color
+		}
+	}
 
-// void mouse_callback(int  event, int  x, int  y, int  flag, void *param)
-// {
-//     if (event == EVENT_LBUTTONDOWN)
-//     {
-//         // Store point coordinates
-//         pt.x = x;
-//         pt.y = y;
-//     }
-// }
+	return lineCol;
+}
 
 Mat drawL(int posX, int posY, int lastX, int lastY, Scalar lineCol, int thickness, Mat drawPanel){
-	if(posX > 0 && posX < 110){	
-		if(posY > 0 && posY < 115){	// close window
-			printf("Close\n");
-		}
-		else if(posY > 135 && posY < 205){	// erase screen
-			// frame.setTo(Scalar(0,0,0));	// black frame	
-			// drawPanel.setTo(Scalar(255,255,255));	// white panel
-			cout << "Screen cleared" << endl;
-		}
-	}
-	else if(posX > 550){
-		if(posY < 155){
-			lineCol = Scalar(0,0,255);	// red color
-			cout << "Red" << endl;
-		}
-		else if(posY > 170 && posY < 310){
-			lineCol = Scalar(0,255,0); // green color
-			cout << "Green" << endl;
-		}
-		else if(posY > 340 && posY < 475){
-			lineCol = Scalar(255,0,0);	// blue color
-			cout << "Blue" << endl;
-		}
-	}
-
-	if(posY > 0 && posY < 480){
-		if((posY > 220 && posX > 0 && posX < 540) || (posX > 120 && posX < 540)){
-			line(drawPanel, Point(posX,posY), Point(lastX,lastY), lineCol, thickness);
+	if(posX != -1 && posY != -1 && lastX != -1 && lastY != -1){
+		if(posY > 0 && posY < 480){
+			if((posY > 220 && posX > 0 && posX < 540) || (posX > 120 && posX < 540)){
+				line(drawPanel, Point(posX,posY), Point(lastX,lastY), lineCol, thickness);
+			}
 		}
 	}
 
@@ -104,54 +83,95 @@ tuple<Mat, Mat> getMask(Mat matrix){
 
 int main(int argc, char** argv){
 	VideoCapture cap;
-	Mat frame, scribbles;
+	Mat frame;
 
-	Scalar lineCol;	// default color line -> blue
+	// Default color line -> blue
+	Scalar lineCol;	
 	lineCol  = Scalar(255,0,0);
 
-	// open default camera with 0
+	// Open default camera with 0
 	if(!cap.open(0)){
 		cout << "Could not initialize capturing!!";
 		return -1;
 	}
-
-	// cout << cap.get(3);	width
-	// cout << cap.get(4);	height
 	
-	Point pos(cap.get(3)/2,cap.get(4)/2);
+	int width = cap.get(3);
+	int height = cap.get(4);
 
-	// white panel
-	Mat drawPanel(cap.get(4), cap.get(3), CV_8UC4, Scalar(255,255,255,0));	
+	Point pos(width/2,height/2);
+
+	// White panel
+	Mat drawPanel(height, width, CV_8UC3, Scalar(255,255,255,0));	
+	
+	// Mat to concatenate frame and drawPanel
+	Mat output(height, width*2, CV_8UC3, Scalar::all(0));
 
 	Mat layout = imread("paint.png", -1);
 	Mat mask; 
 	tie(mask, layout) = getMask(layout);
 	
-    // namedWindow("Live Video Paint", 1);
-    // setMouseCallback("Live Video Paint", mouse_callback);
+	int close = 90; 	// at 30 FPS = 3 secs
+	int clear = 90;		// at 30 FPS = 3 secs
 
 	while(true){
 		cap >> frame;
 		
-		if(frame.empty()) break;	// end of video frame
+		// end of video frame
+		if(frame.empty()) break;	
 
-		medianBlur(frame, frame, 5);	// decrease background noise
-		layout.copyTo(frame, mask);
+		// Flip image to draw according to movements
+		flip(frame,frame,1);	
 
+		// Decrease background noise
+		medianBlur(frame, frame, 5);	
+
+		// Keep object last position to draw line
 		int lastX = pos.x;
 		int lastY = pos.y;
 
-		// get mean coordinates of yellow object
+		// Get mean coordinates of yellow object
 		pos = objectCoords(frame, Scalar(20,100,100), Scalar(30,255,255));
 		
+		// Close windows or Clear DrawPanel
+		if(pos.x > 0 && pos.x < 110){	
+			if(pos.y > 0 && pos.y < 115){	// close windows
+				close--;
+				string c = "Closing window in: " + to_string(close/30+1);
+				putText(frame, c, Point((width/2)-100, 30), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0), 2);
+				if(close == 0){				
+					break;					
+					close = 90;
+				}
+			}
+			else if(pos.y > 135 && pos.y < 205){	// erase screen
+				clear--;
+				string c = "Erasing screen in: " + to_string(clear/30+1);
+				putText(frame, c, Point((width/2)-100, 30), FONT_HERSHEY_SIMPLEX, 0.7, Scalar(0,0,0), 2);
+				if(clear == 0){	
+					drawPanel.setTo(Scalar(255,255,255));	// white panel
+					clear = 90;
+				}
+			}
+		}
+		else{
+			close = 90;
+			clear = 90;
+		}
+
+
+		lineCol	= changeColor(pos, lineCol);
 		drawPanel = drawL(pos.x, pos.y, lastX, lastY, lineCol, 2, drawPanel);
 
-		imshow("Live Video Paint", frame);
-		imshow("Draw Panel", drawPanel);
+		layout.copyTo(frame, mask);
+
+		frame.copyTo(output(Rect(0,0,width,height)));
+		drawPanel.copyTo(output(Rect(width,0,width,height)));
+
+		imshow("Live Video Paint", output);
 
 		int c = waitKey(10);
 		if(c == 27){
-			break;	// stop capturing bye pressing ESC
+			break;	// stop capturing by pressing ESC
 		}
 		else if((char)c == 'R' || (char)c == 'r'){	// reset
 			frame.setTo(Scalar(0,0,0));	// black frame	
