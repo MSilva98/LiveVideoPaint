@@ -63,7 +63,7 @@ Scalar changeColor(Point pos, Scalar lineCol){
 Mat drawL(int posX, int posY, int lastX, int lastY, Scalar lineCol, int thickness, Mat drawPanel){
 	if(posX != -1 && posY != -1 && lastX != -1 && lastY != -1){
 		if(posY > 0 && posY < 480){
-			if((posY > 220 && posX > 0 && posX < 540) || (posX > 120 && posX < 540)){
+			if(posX > 115 && posX < 540){
 				line(drawPanel, Point(posX,posY), Point(lastX,lastY), lineCol, thickness);
 			}
 		}
@@ -85,10 +85,6 @@ int main(int argc, char** argv){
 	VideoCapture cap;
 	Mat frame;
 
-	// Default color line -> blue
-	Scalar lineCol;	
-	lineCol  = Scalar(255,0,0);
-
 	// Open default camera with 0
 	if(!cap.open(0)){
 		cout << "Could not initialize capturing!!";
@@ -106,12 +102,17 @@ int main(int argc, char** argv){
 	// Mat to concatenate frame and drawPanel
 	Mat output(height, width*2, CV_8UC3, Scalar::all(0));
 
-	Mat layout = imread("paint.png", -1);
+	Mat layout = imread("paint2.png", -1);
 	Mat mask; 
 	tie(mask, layout) = getMask(layout);
 	
 	int close = 90; 	// at 30 FPS = 3 secs
 	int clear = 90;		// at 30 FPS = 3 secs
+	int thickness = 30;	// line thickness
+
+	// Default color line -> blue
+	Scalar lineCol;	
+	lineCol  = Scalar(255,0,0);
 
 	while(true){
 		cap >> frame;
@@ -158,9 +159,24 @@ int main(int argc, char** argv){
 			clear = 90;
 		}
 
+		// Line thickness
+		if(pos.x > 20 && pos.x < 90){
+			if(pos.y > 325 && pos.y < 390){
+				thickness++;
+			}
+			else if(pos.y > 435 && pos.y < 460){
+				thickness--;
+				if(thickness <= 15){
+					thickness = 15;
+				}
+			}
+		}
+
+		// line thickness
+		putText(frame, to_string(thickness/15), Point(45,425), FONT_HERSHEY_SIMPLEX, 1, Scalar(0,0,0), 2);
 
 		lineCol	= changeColor(pos, lineCol);
-		drawPanel = drawL(pos.x, pos.y, lastX, lastY, lineCol, 2, drawPanel);
+		drawPanel = drawL(pos.x, pos.y, lastX, lastY, lineCol, thickness/15, drawPanel);
 
 		layout.copyTo(frame, mask);
 
