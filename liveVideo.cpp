@@ -102,7 +102,7 @@ int main(int argc, char** argv){
 	// Mat to concatenate frame and drawPanel
 	Mat output(height, width*2, CV_8UC3, Scalar::all(0));
 
-	Mat layout = imread("paint2.png", -1);
+	Mat layout = imread("paint.png", -1);
 	Mat mask; 
 	tie(mask, layout) = getMask(layout);
 	
