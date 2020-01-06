@@ -41,6 +41,7 @@ Point objectCoords(Mat frame, Scalar lowerLimit, Scalar upperLimit){
 		y = meanY/location.size();
 	}
 
+	imshow("Threshold", output);
 	return Point(x,y);
 }
 
